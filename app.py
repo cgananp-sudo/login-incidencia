@@ -31,6 +31,9 @@ def init_db():
             "INSERT INTO users (username, password) VALUES (?, ?)",
             ("jgarcia", hash_pw("Clave123")),
         )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)"
+    )
     conn.commit()
     conn.close()
 
@@ -60,21 +63,22 @@ def login():
     username, password = data.get("username"), data.get("password")
 
     if failed_attempts >= 3:
-        return jsonify({"error": "Internal Server Error"}), 500
+        return jsonify({"error": "Demasiados intentos fallidos. Intente más tarde."}), 429
 
     try:
         user = find_user(username)
-        if user and user[1] == hash_pw(password):
-            failed_attempts = 0
-            return jsonify({"message": "Login exitoso"}), 200
-        failed_attempts += 1
-        return jsonify({"error": "Error: credenciales no válidas. Inténtelo nuevamente."}), 401
     except Exception:
-        # BUG: cualquier falla interna se reporta como credenciales inválidas
+        # Falla del servicio: no es culpa del usuario ni cuenta como intento fallido
         auth_service.error("Error validating user token")
         auth_controller.warning(f"Login attempt failed for user: {username}")
-        failed_attempts += 1
-        return jsonify({"error": "Error: credenciales no válidas. Inténtelo nuevamente."}), 401
+        return jsonify({"error": "Servicio no disponible. Intente nuevamente en unos minutos."}), 503
+
+    if user and user[1] == hash_pw(password):
+        failed_attempts = 0
+        return jsonify({"message": "Login exitoso"}), 200
+
+    failed_attempts += 1
+    return jsonify({"error": "Error: credenciales no válidas. Inténtelo nuevamente."}), 401
 
 
 if __name__ == "__main__":
