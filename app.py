@@ -31,6 +31,9 @@ def init_db():
             "INSERT INTO users (username, password) VALUES (?, ?)",
             ("jgarcia", hash_pw("Clave123")),
         )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)"
+    )
     conn.commit()
     conn.close()
 
